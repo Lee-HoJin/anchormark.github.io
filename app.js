@@ -264,7 +264,12 @@ function renderGroupedBarChart(canvas, group) {
       },
       scales: {
         x: { ticks: { color: "#68746f" }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: "#68746f" }, grid: { color: "#ebe4d5" } },
+        y: {
+          min: 0.6,
+          max: 1.0,
+          ticks: { color: "#68746f" },
+          grid: { color: "#ebe4d5" },
+          },
       },
     },
   });
