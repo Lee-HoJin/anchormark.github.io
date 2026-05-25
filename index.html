@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Watermark Experiment Dashboard</title>
     <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./chart_split.css" />
   </head>
   <body>
     <header class="hero">
@@ -21,34 +22,39 @@
     </header>
 
     <main>
-      <section class="chartGrid" aria-label="Experiment charts">
-        <article class="panel chartPanel">
-          <div class="panelHeader">
-            <div>
-              <p class="panelKicker">Bar Chart</p>
-              <h2>Main Results</h2>
-            </div>
-            <span id="mainStatus" class="status">Loading</span>
+      <section class="panel">
+        <div class="panelHeader">
+          <div>
+            <p class="panelKicker">Grouped Bar Charts</p>
+            <h2>Main Results</h2>
+          </div>
+          <span id="mainStatus" class="status">Loading</span>
+        </div>
+        <div class="splitCharts">
+          <div class="chartBody">
+            <h3 class="chartTitle">Original</h3>
+            <canvas id="mainOriginalChart" aria-label="Original main results bar chart"></canvas>
           </div>
           <div class="chartBody">
-            <canvas id="mainChart" aria-label="Main results bar chart"></canvas>
-            <p id="mainEmpty" class="empty" hidden></p>
+            <h3 class="chartTitle">Paraphrased</h3>
+            <canvas id="mainParaphrasedChart" aria-label="Paraphrased main results bar chart"></canvas>
           </div>
-        </article>
+          <p id="mainEmpty" class="empty" hidden></p>
+        </div>
+      </section>
 
-        <article class="panel chartPanel">
-          <div class="panelHeader">
-            <div>
-              <p class="panelKicker">Line Chart</p>
-              <h2>Hyperparameter Analysis</h2>
-            </div>
-            <span id="hyperStatus" class="status">Loading</span>
+      <section class="panel">
+        <div class="panelHeader">
+          <div>
+            <p class="panelKicker">Line Chart</p>
+            <h2>Hyperparameter Analysis</h2>
           </div>
-          <div class="chartBody">
-            <canvas id="hyperChart" aria-label="Hyperparameter analysis line chart"></canvas>
-            <p id="hyperEmpty" class="empty" hidden></p>
-          </div>
-        </article>
+          <span id="hyperStatus" class="status">Loading</span>
+        </div>
+        <div class="chartBody">
+          <canvas id="hyperChart" aria-label="Hyperparameter analysis line chart"></canvas>
+          <p id="hyperEmpty" class="empty" hidden></p>
+        </div>
       </section>
 
       <section class="panel">

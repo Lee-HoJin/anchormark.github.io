@@ -1,0 +1,2 @@
+Add this line in index.html head if chart_split.css is not already bundled into style.css:
+<link rel="stylesheet" href="./chart_split.css" />

@@ -20,8 +20,9 @@ const els = {
   hyperRows: document.querySelector("#hyperRows"),
   reportCount: document.querySelector("#reportCount"),
   mainStatus: document.querySelector("#mainStatus"),
+  mainOriginalChart: document.querySelector("#mainOriginalChart"),
+  mainParaphrasedChart: document.querySelector("#mainParaphrasedChart"),
   hyperStatus: document.querySelector("#hyperStatus"),
-  mainChart: document.querySelector("#mainChart"),
   hyperChart: document.querySelector("#hyperChart"),
   mainEmpty: document.querySelector("#mainEmpty"),
   hyperEmpty: document.querySelector("#hyperEmpty"),
@@ -42,7 +43,6 @@ function parseCsv(text) {
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
     const next = text[i + 1];
-
     if (char === '"' && quoted && next === '"') {
       cell += '"';
       i += 1;
@@ -52,13 +52,9 @@ function parseCsv(text) {
       row.push(cell);
       cell = "";
     } else if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && next === "\n") {
-        i += 1;
-      }
+      if (char === "\r" && next === "\n") i += 1;
       row.push(cell);
-      if (row.some((value) => value.trim() !== "")) {
-        rows.push(row);
-      }
+      if (row.some((value) => value.trim() !== "")) rows.push(row);
       row = [];
       cell = "";
     } else {
@@ -67,10 +63,7 @@ function parseCsv(text) {
   }
 
   row.push(cell);
-  if (row.some((value) => value.trim() !== "")) {
-    rows.push(row);
-  }
-
+  if (row.some((value) => value.trim() !== "")) rows.push(row);
   const headers = rows.shift() ?? [];
   return {
     headers,
@@ -82,19 +75,15 @@ function parseCsv(text) {
 
 async function loadFirst(paths) {
   const errors = [];
-
   for (const path of paths) {
     try {
       const response = await fetch(path);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return { path, ...parseCsv(await response.text()) };
     } catch (error) {
       errors.push(`${path}: ${error.message}`);
     }
   }
-
   throw new Error(errors.join("\n"));
 }
 
@@ -142,25 +131,36 @@ function chartColors(count) {
   return Array.from({ length: count }, (_, index) => palette[index % palette.length]);
 }
 
-function renderMainChart() {
-  const { headers, rows } = state.main;
-  const labelColumn = pickLabelColumn(headers);
+function splitMainMetricColumns(headers, rows, labelColumn) {
   const numericColumns = pickNumericColumns(headers, rows).filter(
     (header) => header !== labelColumn && !/z[\s_-]*score|zscore/i.test(header),
   );
+  const original = numericColumns.filter((header) => /(^|[_\s-])(orig|original)([_\s-]|$)/i.test(header));
+  const paraphrased = numericColumns.filter((header) => /para|paraphrase|paraphrased|rewrite|rewritten/i.test(header));
 
-  if (!rows.length || !labelColumn || numericColumns.length === 0) {
-    showEmpty(els.mainEmpty, "main_results.csv loaded, but no non-Z-score numeric columns were found.");
-    return;
+  if (original.length || paraphrased.length) {
+    const originalFallback = numericColumns.filter((header) => !paraphrased.includes(header));
+    const paraphrasedFallback = numericColumns.filter((header) => !original.includes(header));
+    return {
+      original: (original.length ? original : originalFallback).slice(0, 3),
+      paraphrased: (paraphrased.length ? paraphrased : paraphrasedFallback.slice(3)).slice(0, 3),
+    };
   }
 
-  const colors = chartColors(numericColumns.length);
+  return {
+    original: numericColumns.slice(0, 3),
+    paraphrased: numericColumns.slice(3, 6),
+  };
+}
 
-  new Chart(els.mainChart, {
+function renderGroupedBarChart(canvas, title, rows, labelColumn, columns) {
+  if (!columns.length) return;
+  const colors = chartColors(columns.length);
+  new Chart(canvas, {
     type: "bar",
     data: {
       labels: rows.map((row, index) => row[labelColumn] || `Row ${index + 1}`),
-      datasets: numericColumns.map((column, index) => ({
+      datasets: columns.map((column, index) => ({
         label: column,
         data: rows.map((row) => numericValue(row[column]) ?? 0),
         backgroundColor: colors[index],
@@ -172,6 +172,7 @@ function renderMainChart() {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
+        title: { display: false, text: title },
         legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } },
         tooltip: { mode: "index", intersect: false },
       },
@@ -183,20 +184,31 @@ function renderMainChart() {
   });
 }
 
+function renderMainChart() {
+  const { headers, rows } = state.main;
+  const labelColumn = pickLabelColumn(headers);
+  const groups = splitMainMetricColumns(headers, rows, labelColumn);
+
+  if (!rows.length || !labelColumn || (!groups.original.length && !groups.paraphrased.length)) {
+    showEmpty(els.mainEmpty, "main_results.csv loaded, but no original/paraphrased numeric metric columns were found.");
+    return;
+  }
+
+  renderGroupedBarChart(els.mainOriginalChart, "Original", rows, labelColumn, groups.original);
+  renderGroupedBarChart(els.mainParaphrasedChart, "Paraphrased", rows, labelColumn, groups.paraphrased);
+}
+
 function renderHyperChart() {
   const { headers, rows } = state.hyper;
   const labelColumn =
     headers.find((header) => /param|alpha|beta|gamma|lambda|threshold|step|x|value/i.test(header)) ??
     headers[0];
   const numericColumns = pickNumericColumns(headers, rows).filter((header) => header !== labelColumn);
-
   if (!rows.length || !labelColumn || numericColumns.length === 0) {
     showEmpty(els.hyperEmpty, "hyperparameter_analysis.csv loaded, but no line-series columns were found.");
     return;
   }
-
   const colors = chartColors(numericColumns.length);
-
   new Chart(els.hyperChart, {
     type: "line",
     data: {
@@ -216,9 +228,7 @@ function renderHyperChart() {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
-      plugins: {
-        legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } },
-      },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } } },
       scales: {
         x: { ticks: { color: "#68746f" }, grid: { display: false } },
         y: { beginAtZero: true, ticks: { color: "#68746f" }, grid: { color: "#ebe4d5" } },
@@ -230,63 +240,42 @@ function renderHyperChart() {
 function isDetected(row) {
   const direct = Object.entries(row).find(([key]) => /detect|watermark|prediction|result/i.test(key));
   const value = String(direct?.[1] ?? Object.values(row).join(" ")).toLowerCase();
-
-  if (/\b(not detected|false|clean|negative|no watermark|benign)\b/.test(value)) {
-    return false;
-  }
-
+  if (/\b(not detected|false|clean|negative|no watermark|benign)\b/.test(value)) return false;
   return /\b(detected|true|watermarked|positive|yes)\b/.test(value);
 }
 
 function formatCell(header, value, row) {
   if (/detect|watermark|prediction|result/i.test(header)) {
     const detected = isDetected(row);
-    const label = value || (detected ? "Detected" : "Not detected");
-    return `<span class="pill ${detected ? "good" : "bad"}">${escapeHtml(label)}</span>`;
+    return `<span class="pill ${detected ? "good" : "bad"}">${escapeHtml(value || (detected ? "Detected" : "Not detected"))}</span>`;
   }
-
   if (/^https?:\/\//i.test(value)) {
     return `<a href="${escapeAttribute(value)}" target="_blank" rel="noreferrer">${escapeHtml(value)}</a>`;
   }
-
   return escapeHtml(value);
 }
 
 function renderTable() {
   const { headers, filteredRows } = state.detection;
   els.tableHead.innerHTML = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
-
   if (filteredRows.length === 0) {
     els.tableBody.innerHTML = `<tr><td class="empty" colspan="${headers.length || 1}">No rows match the current filters.</td></tr>`;
     return;
   }
-
   els.tableBody.innerHTML = filteredRows
-    .map(
-      (row) =>
-        `<tr>${headers
-          .map((header) => `<td>${formatCell(header, row[header] ?? "", row)}</td>`)
-          .join("")}</tr>`,
-    )
+    .map((row) => `<tr>${headers.map((header) => `<td>${formatCell(header, row[header] ?? "", row)}</td>`).join("")}</tr>`)
     .join("");
 }
 
 function applyFilters() {
   const query = els.searchInput.value.trim().toLowerCase();
   const filter = els.resultFilter.value;
-
   state.detection.filteredRows = state.detection.rows.filter((row) => {
     const detected = isDetected(row);
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "detected" && detected) ||
-      (filter === "not-detected" && !detected);
-    const matchesQuery =
-      query === "" || Object.values(row).join(" ").toLowerCase().includes(query);
-
+    const matchesFilter = filter === "all" || (filter === "detected" && detected) || (filter === "not-detected" && !detected);
+    const matchesQuery = query === "" || Object.values(row).join(" ").toLowerCase().includes(query);
     return matchesFilter && matchesQuery;
   });
-
   renderTable();
 }
 
@@ -294,10 +283,7 @@ function renderReports() {
   els.reportCount.textContent = htmlReports.length.toLocaleString();
   els.reportGrid.innerHTML = htmlReports
     .map(
-      (report) => `<a class="reportCard" href="${escapeAttribute(report.path)}" target="_blank" rel="noreferrer">
-        <strong>${escapeHtml(report.title)}</strong>
-        <span>${escapeHtml(report.path)}</span>
-      </a>`,
+      (report) => `<a class="reportCard" href="${escapeAttribute(report.path)}" target="_blank" rel="noreferrer"><strong>${escapeHtml(report.title)}</strong><span>${escapeHtml(report.path)}</span></a>`,
     )
     .join("");
 }
@@ -314,7 +300,6 @@ async function initCharts() {
     showEmpty(els.mainEmpty, "Could not load main_results.csv. Check the path list in app.js.");
     console.error(error);
   }
-
   try {
     const hyper = await loadFirst(files.hyper);
     state.hyper = hyper;
