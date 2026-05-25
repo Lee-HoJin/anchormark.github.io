@@ -205,64 +205,34 @@ function buildLongMainGroups(headers, rows) {
 }
 
 function buildMainChartGroups(headers, rows) {
-  const longGroups = buildLongMainGroups(headers, rows);
-  if (longGroups?.original.datasets.length || longGroups?.paraphrased.datasets.length) {
-    return longGroups;
-  }
+  if (headers[0]?.toLowerCase() === "metrics") {
+    const modelColumns = headers.slice(1);
 
-  const labelColumn = pickLabelColumn(headers, rows);
-  const numericColumns = pickNumericColumns(headers, rows).filter(
-    (header) => header !== labelColumn && !isZScore(header),
-  );
-  const originalColumns = numericColumns.filter(isOriginalName);
-  const paraphrasedColumns = numericColumns.filter(isParaphrasedName);
+    function rowFor(label) {
+      return rows.find((row) => String(row.metrics).toLowerCase() === label.toLowerCase());
+    }
 
-  if (originalColumns.length || paraphrasedColumns.length) {
+    function makeGroup(prefix) {
+      const metricRows = [
+        ["AUC", rowFor(`${prefix} AUC`)],
+        ["F1", rowFor(`${prefix} F1`)],
+        ["ACC", rowFor(`${prefix} Acc`)],
+      ].filter(([, row]) => row);
+
+      return {
+        labels: modelColumns,
+        datasets: metricRows.map(([metric, row]) => ({
+          label: metric,
+          values: modelColumns.map((model) => numericValue(row[model]) ?? 0),
+        })),
+      };
+    }
+
     return {
-      original: buildWideMainGroup(rows, labelColumn, (originalColumns.length ? originalColumns : numericColumns).slice(0, 3)),
-      paraphrased: buildWideMainGroup(
-        rows,
-        labelColumn,
-        (paraphrasedColumns.length ? paraphrasedColumns : numericColumns.filter((column) => !originalColumns.includes(column)).slice(3)).slice(0, 3),
-      ),
+      original: makeGroup("Original"),
+      paraphrased: makeGroup("Paraphrased"),
     };
   }
-
-  return {
-    original: buildWideMainGroup(rows, labelColumn, numericColumns.slice(0, 3)),
-    paraphrased: buildWideMainGroup(rows, labelColumn, numericColumns.slice(3, 6)),
-  };
-}
-
-function renderGroupedBarChart(canvas, group) {
-  if (!canvas || !group?.datasets.length) return;
-  const colors = chartColors(group.datasets.length);
-  new Chart(canvas, {
-    type: "bar",
-    data: {
-      labels: group.labels,
-      datasets: group.datasets.map((dataset, index) => ({
-        label: dataset.label,
-        data: dataset.values,
-        backgroundColor: colors[index],
-        borderRadius: 7,
-        borderSkipped: false,
-      })),
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } },
-        tooltip: { mode: "index", intersect: false },
-      },
-      scales: {
-        x: { ticks: { color: "#68746f" }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: "#68746f" }, grid: { color: "#ebe4d5" } },
-      },
-    },
-  });
-}
 
 function renderMainChart() {
   const { headers, rows } = state.main;
