@@ -234,6 +234,42 @@ function buildMainChartGroups(headers, rows) {
     };
   }
 
+  return {
+    original: buildWideMainGroup(rows, labelColumn, numericColumns.slice(0, 3)),
+    paraphrased: buildWideMainGroup(rows, labelColumn, numericColumns.slice(3, 6)),
+  };
+}
+
+function renderGroupedBarChart(canvas, group) {
+  if (!canvas || !group?.datasets.length) return;
+  const colors = chartColors(group.datasets.length);
+  new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: group.labels,
+      datasets: group.datasets.map((dataset, index) => ({
+        label: dataset.label,
+        data: dataset.values,
+        backgroundColor: colors[index],
+        borderRadius: 7,
+        borderSkipped: false,
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } },
+        tooltip: { mode: "index", intersect: false },
+      },
+      scales: {
+        x: { ticks: { color: "#68746f" }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: "#68746f" }, grid: { color: "#ebe4d5" } },
+      },
+    },
+  });
+}
+
 function renderMainChart() {
   const { headers, rows } = state.main;
   const groups = buildMainChartGroups(headers, rows);
