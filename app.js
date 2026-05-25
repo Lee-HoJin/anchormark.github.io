@@ -178,25 +178,21 @@ function buildLongMainGroups(headers, rows) {
     .filter((metric) => !isZScore(metric))
     .slice(0, 3);
 
-  function makeGroup(metrics, fallbackRows) {
-    const selected = metrics.length
-      ? metrics
-      : [...new Set(fallbackRows.map((row) => row[metricColumn]))].filter((metric) => !isZScore(metric)).slice(0, 3);
+  function makeGroup(prefix) {
+    const metricRows = [
+      ["AUC", rowFor(`${prefix} AUC`)],
+      ["F1", rowFor(`${prefix} F1`)],
+      ["ACC", rowFor(`${prefix} Acc`)],
+    ].filter(([, row]) => row);
+
     return {
-      labels,
-      datasets: selected.map((metric) => ({
-        label: metricLabel(metric) || metric,
-        values: labels.map((label) => {
-          const row = rows.find(
-            (candidate) =>
-              (candidate[labelColumn] || candidate.method || candidate.model || "Result") === label &&
-              candidate[metricColumn] === metric,
-          );
-          return numericValue(row?.[valueColumn]) ?? 0;
-        }),
+      labels: metricRows.map(([metric]) => metric),
+      datasets: modelColumns.map((model) => ({
+        label: model,
+        values: metricRows.map(([, row]) => numericValue(row[model]) ?? 0),
       })),
     };
-  }
+  } 
 
   return {
     original: makeGroup(originalMetrics, rows.slice(0, 3)),
@@ -265,11 +261,11 @@ function renderGroupedBarChart(canvas, group) {
       scales: {
         x: { ticks: { color: "#68746f" }, grid: { display: false } },
         y: {
-          min: 0.6,
-          max: 1.0,
-          ticks: { color: "#68746f" },
-          grid: { color: "#ebe4d5" },
-          },
+        min: 0.7,
+        max: 1.0,
+        ticks: { color: "#68746f" },
+        grid: { color: "#ebe4d5" },
+      },
       },
     },
   });
