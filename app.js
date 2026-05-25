@@ -199,7 +199,6 @@ function buildLongMainGroups(headers, rows) {
     paraphrased: makeGroup(paraphrasedMetrics, rows.slice(3, 6)),
   };
 }
-
 function buildMainChartGroups(headers, rows) {
   if (headers[0]?.toLowerCase() === "metrics") {
     const modelColumns = headers.slice(1);
@@ -216,10 +215,10 @@ function buildMainChartGroups(headers, rows) {
       ].filter(([, row]) => row);
 
       return {
-        labels: modelColumns,
-        datasets: metricRows.map(([metric, row]) => ({
-          label: metric,
-          values: modelColumns.map((model) => numericValue(row[model]) ?? 0),
+        labels: ["AUC", "F1", "ACC"],
+        datasets: modelColumns.map((model) => ({
+          label: model,
+          values: metricRows.map(([, row]) => numericValue(row[model]) ?? 0),
         })),
       };
     }
