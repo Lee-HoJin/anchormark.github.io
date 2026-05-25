@@ -11,24 +11,12 @@
       <div class="heroCopy">
         <p class="eyebrow">Watermark Experiment</p>
         <h1>Detection Results Dashboard</h1>
-        <p class="lede">
-          Main results, hyperparameter trends, and generated qualitative reports in one
-          GitHub Pages-friendly view.
-        </p>
+        <p class="lede">Main results, hyperparameter trends, and generated qualitative reports in one GitHub Pages-friendly view.</p>
       </div>
       <div class="heroStats" aria-label="Dataset summary">
-        <article>
-          <span>Main Rows</span>
-          <strong id="mainRows">0</strong>
-        </article>
-        <article>
-          <span>Hyperparameter Rows</span>
-          <strong id="hyperRows">0</strong>
-        </article>
-        <article>
-          <span>Reports</span>
-          <strong id="reportCount">0</strong>
-        </article>
+        <article><span>Main Rows</span><strong id="mainRows">0</strong></article>
+        <article><span>Hyperparameter Rows</span><strong id="hyperRows">0</strong></article>
+        <article><span>Reports</span><strong id="reportCount">0</strong></article>
       </div>
     </header>
 
@@ -40,7 +28,10 @@
               <p class="panelKicker">Bar Chart</p>
               <h2>Main Results</h2>
             </div>
-            <span id="mainStatus" class="status">Loading</span>
+            <div class="chartTools">
+              <select id="mainMetricSelect" aria-label="Select main result metric"></select>
+              <span id="mainStatus" class="status">Loading</span>
+            </div>
           </div>
           <div class="chartBody">
             <canvas id="mainChart" aria-label="Main results bar chart"></canvas>

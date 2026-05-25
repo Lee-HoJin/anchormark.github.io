@@ -1,0 +1,4 @@
+This dashboard update expects:
+- index.html to include a #mainMetricSelect select next to #mainStatus.
+- app.js to render one selected main_results metric at a time.
+- anchor_report.js to highlight original and paraphrased anchor tokens from JSONL fields.

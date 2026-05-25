@@ -8,8 +8,6 @@
   --line: #ded8c9;
   --teal: #0c7a75;
   --teal-2: #075d59;
-  --coral: #d9664f;
-  --gold: #d6a13d;
   --good: #19734d;
   --bad: #b33b2e;
   --shadow: 0 18px 50px rgba(36, 41, 38, 0.1);
@@ -181,8 +179,10 @@ canvas {
   height: 350px;
 }
 
-.toolbar {
+.toolbar,
+.chartTools {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   justify-content: end;
   gap: 10px;
@@ -205,6 +205,7 @@ input {
 }
 
 select {
+  max-width: min(360px, 58vw);
   padding: 0 32px 0 12px;
 }
 
@@ -345,9 +346,11 @@ code {
   }
 
   .toolbar,
+  .chartTools,
   input,
   select,
   button {
     width: 100%;
+    max-width: none;
   }
 }
