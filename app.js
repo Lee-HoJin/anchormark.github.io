@@ -318,7 +318,7 @@ function renderHyperChart() {
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } } },
       scales: {
         x: { ticks: { color: "#68746f" }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: "#68746f" }, grid: { color: "#ebe4d5" } },
+        y: { min:0.4, ticks: { color: "#68746f" }, grid: { color: "#ebe4d5" } },
       },
     },
   });
