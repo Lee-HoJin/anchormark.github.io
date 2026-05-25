@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Watermark Experiment Dashboard</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="heroCopy">
+        <p class="eyebrow">Watermark Experiment</p>
+        <h1>Detection Results Dashboard</h1>
+        <p class="lede">
+          Main results, hyperparameter trends, and generated qualitative reports in one
+          GitHub Pages-friendly view.
+        </p>
+      </div>
+      <div class="heroStats" aria-label="Dataset summary">
+        <article>
+          <span>Main Rows</span>
+          <strong id="mainRows">0</strong>
+        </article>
+        <article>
+          <span>Hyperparameter Rows</span>
+          <strong id="hyperRows">0</strong>
+        </article>
+        <article>
+          <span>Reports</span>
+          <strong id="reportCount">0</strong>
+        </article>
+      </div>
+    </header>
+
+    <main>
+      <section class="chartGrid" aria-label="Experiment charts">
+        <article class="panel chartPanel">
+          <div class="panelHeader">
+            <div>
+              <p class="panelKicker">Bar Chart</p>
+              <h2>Main Results</h2>
+            </div>
+            <span id="mainStatus" class="status">Loading</span>
+          </div>
+          <div class="chartBody">
+            <canvas id="mainChart" aria-label="Main results bar chart"></canvas>
+            <p id="mainEmpty" class="empty" hidden></p>
+          </div>
+        </article>
+
+        <article class="panel chartPanel">
+          <div class="panelHeader">
+            <div>
+              <p class="panelKicker">Line Chart</p>
+              <h2>Hyperparameter Analysis</h2>
+            </div>
+            <span id="hyperStatus" class="status">Loading</span>
+          </div>
+          <div class="chartBody">
+            <canvas id="hyperChart" aria-label="Hyperparameter analysis line chart"></canvas>
+            <p id="hyperEmpty" class="empty" hidden></p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <div>
+            <p class="panelKicker">CSV Table</p>
+            <h2>Detection Results</h2>
+          </div>
+          <div class="toolbar">
+            <input id="searchInput" type="search" placeholder="Search rows..." />
+            <select id="resultFilter" aria-label="Filter detection results">
+              <option value="all">All</option>
+              <option value="detected">Detected</option>
+              <option value="not-detected">Not detected</option>
+            </select>
+            <button id="downloadCsv" type="button">CSV</button>
+          </div>
+        </div>
+        <div class="tableWrap">
+          <table>
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <div>
+            <p class="panelKicker">Generated HTML</p>
+            <h2>Report Links</h2>
+          </div>
+        </div>
+        <div id="reportGrid" class="reportGrid"></div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

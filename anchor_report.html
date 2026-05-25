@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Anchor Quality Report</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./anchor_report.css" />
+  </head>
+  <body>
+    <header class="hero reportHero">
+      <div class="heroCopy">
+        <p class="eyebrow">Generated HTML</p>
+        <h1 id="reportTitle">Anchor Quality Report</h1>
+        <p id="reportSource" class="lede"></p>
+      </div>
+      <a class="backLink" href="./index.html">Back to dashboard</a>
+    </header>
+
+    <main>
+      <section class="panel reportControls">
+        <div class="panelHeader">
+          <div>
+            <p class="panelKicker">JSONL Viewer</p>
+            <h2>Samples</h2>
+          </div>
+          <div class="toolbar">
+            <input id="reportSearch" type="search" placeholder="Search text or fields..." />
+            <select id="fieldMode" aria-label="Field display mode">
+              <option value="summary">Summary</option>
+              <option value="all">All fields</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section id="summaryGrid" class="summaryGrid" aria-label="Report summary"></section>
+      <section id="sampleList" class="sampleList" aria-label="Report samples"></section>
+      <p id="reportEmpty" class="empty" hidden></p>
+    </main>
+
+    <script src="./anchor_report.js"></script>
+  </body>
+</html>
