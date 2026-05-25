@@ -105,17 +105,6 @@ function escapeAttribute(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
 }
 
-function pickLabelColumn(headers) {
-  return (
-    headers.find((header) => /method|model|attack|dataset|name|type|config|setting/i.test(header)) ??
-    headers[0]
-  );
-}
-
-function pickNumericColumns(headers, rows) {
-  return headers.filter((header) => rows.some((row) => numericValue(row[header]) !== null));
-}
-
 function setStatus(element, type, text) {
   element.className = `status ${type}`;
   element.textContent = text;
@@ -131,38 +120,130 @@ function chartColors(count) {
   return Array.from({ length: count }, (_, index) => palette[index % palette.length]);
 }
 
-function splitMainMetricColumns(headers, rows, labelColumn) {
-  const numericColumns = pickNumericColumns(headers, rows).filter(
-    (header) => header !== labelColumn && !/z[\s_-]*score|zscore/i.test(header),
-  );
-  const original = numericColumns.filter((header) => /(^|[_\s-])(orig|original)([_\s-]|$)/i.test(header));
-  const paraphrased = numericColumns.filter((header) => /para|paraphrase|paraphrased|rewrite|rewritten/i.test(header));
+function isZScore(name) {
+  return /z[\s_-]*score|zscore/i.test(name);
+}
 
-  if (original.length || paraphrased.length) {
-    const originalFallback = numericColumns.filter((header) => !paraphrased.includes(header));
-    const paraphrasedFallback = numericColumns.filter((header) => !original.includes(header));
+function isOriginalName(name) {
+  return /(^|[_\s-])(orig|original)([_\s-]|$)/i.test(name);
+}
+
+function isParaphrasedName(name) {
+  return /para|paraphrase|paraphrased|rewrite|rewritten/i.test(name);
+}
+
+function pickLabelColumn(headers, rows) {
+  const named = headers.find((header) => /method|model|attack|dataset|name|type|config|setting/i.test(header));
+  if (named) return named;
+  return headers.find((header) => rows.some((row) => numericValue(row[header]) === null && row[header] !== "")) ?? headers[0];
+}
+
+function pickNumericColumns(headers, rows) {
+  return headers.filter((header) => rows.some((row) => numericValue(row[header]) !== null));
+}
+
+function metricLabel(header) {
+  return header
+    .replace(/(^|[_\s-])(orig|original|para|paraphrase|paraphrased|rewrite|rewritten)([_\s-]|$)/gi, " ")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildWideMainGroup(rows, labelColumn, columns) {
+  return {
+    labels: rows.map((row, index) => row[labelColumn] || `Row ${index + 1}`),
+    datasets: columns.map((column) => ({
+      label: metricLabel(column) || column,
+      values: rows.map((row) => numericValue(row[column]) ?? 0),
+    })),
+  };
+}
+
+function buildLongMainGroups(headers, rows) {
+  const metricColumn = headers.find((header) => /metric|measure|score|name/i.test(header));
+  const groupColumn = headers.find((header) => /group|split|variant|text|condition|type/i.test(header));
+  const labelColumn = headers.find((header) => /method|model|attack|dataset|config|setting/i.test(header));
+  const valueColumn =
+    headers.find((header) => /value|mean|avg|result|rate|score/i.test(header) && rows.some((row) => numericValue(row[header]) !== null)) ??
+    pickNumericColumns(headers, rows)[0];
+
+  if (!metricColumn || !valueColumn) return null;
+
+  const labels = [...new Set(rows.map((row) => row[labelColumn] || row.method || row.model || "Result"))];
+  const originalMetrics = [...new Set(rows.filter((row) => isOriginalName(row[groupColumn] || row[metricColumn])).map((row) => row[metricColumn]))]
+    .filter((metric) => !isZScore(metric))
+    .slice(0, 3);
+  const paraphrasedMetrics = [...new Set(rows.filter((row) => isParaphrasedName(row[groupColumn] || row[metricColumn])).map((row) => row[metricColumn]))]
+    .filter((metric) => !isZScore(metric))
+    .slice(0, 3);
+
+  function makeGroup(metrics, fallbackRows) {
+    const selected = metrics.length
+      ? metrics
+      : [...new Set(fallbackRows.map((row) => row[metricColumn]))].filter((metric) => !isZScore(metric)).slice(0, 3);
     return {
-      original: (original.length ? original : originalFallback).slice(0, 3),
-      paraphrased: (paraphrased.length ? paraphrased : paraphrasedFallback.slice(3)).slice(0, 3),
+      labels,
+      datasets: selected.map((metric) => ({
+        label: metricLabel(metric) || metric,
+        values: labels.map((label) => {
+          const row = rows.find(
+            (candidate) =>
+              (candidate[labelColumn] || candidate.method || candidate.model || "Result") === label &&
+              candidate[metricColumn] === metric,
+          );
+          return numericValue(row?.[valueColumn]) ?? 0;
+        }),
+      })),
     };
   }
 
   return {
-    original: numericColumns.slice(0, 3),
-    paraphrased: numericColumns.slice(3, 6),
+    original: makeGroup(originalMetrics, rows.slice(0, 3)),
+    paraphrased: makeGroup(paraphrasedMetrics, rows.slice(3, 6)),
   };
 }
 
-function renderGroupedBarChart(canvas, title, rows, labelColumn, columns) {
-  if (!columns.length) return;
-  const colors = chartColors(columns.length);
+function buildMainChartGroups(headers, rows) {
+  const longGroups = buildLongMainGroups(headers, rows);
+  if (longGroups?.original.datasets.length || longGroups?.paraphrased.datasets.length) {
+    return longGroups;
+  }
+
+  const labelColumn = pickLabelColumn(headers, rows);
+  const numericColumns = pickNumericColumns(headers, rows).filter(
+    (header) => header !== labelColumn && !isZScore(header),
+  );
+  const originalColumns = numericColumns.filter(isOriginalName);
+  const paraphrasedColumns = numericColumns.filter(isParaphrasedName);
+
+  if (originalColumns.length || paraphrasedColumns.length) {
+    return {
+      original: buildWideMainGroup(rows, labelColumn, (originalColumns.length ? originalColumns : numericColumns).slice(0, 3)),
+      paraphrased: buildWideMainGroup(
+        rows,
+        labelColumn,
+        (paraphrasedColumns.length ? paraphrasedColumns : numericColumns.filter((column) => !originalColumns.includes(column)).slice(3)).slice(0, 3),
+      ),
+    };
+  }
+
+  return {
+    original: buildWideMainGroup(rows, labelColumn, numericColumns.slice(0, 3)),
+    paraphrased: buildWideMainGroup(rows, labelColumn, numericColumns.slice(3, 6)),
+  };
+}
+
+function renderGroupedBarChart(canvas, group) {
+  if (!canvas || !group?.datasets.length) return;
+  const colors = chartColors(group.datasets.length);
   new Chart(canvas, {
     type: "bar",
     data: {
-      labels: rows.map((row, index) => row[labelColumn] || `Row ${index + 1}`),
-      datasets: columns.map((column, index) => ({
-        label: column,
-        data: rows.map((row) => numericValue(row[column]) ?? 0),
+      labels: group.labels,
+      datasets: group.datasets.map((dataset, index) => ({
+        label: dataset.label,
+        data: dataset.values,
         backgroundColor: colors[index],
         borderRadius: 7,
         borderSkipped: false,
@@ -172,7 +253,6 @@ function renderGroupedBarChart(canvas, title, rows, labelColumn, columns) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        title: { display: false, text: title },
         legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } },
         tooltip: { mode: "index", intersect: false },
       },
@@ -186,16 +266,17 @@ function renderGroupedBarChart(canvas, title, rows, labelColumn, columns) {
 
 function renderMainChart() {
   const { headers, rows } = state.main;
-  const labelColumn = pickLabelColumn(headers);
-  const groups = splitMainMetricColumns(headers, rows, labelColumn);
+  const groups = buildMainChartGroups(headers, rows);
 
-  if (!rows.length || !labelColumn || (!groups.original.length && !groups.paraphrased.length)) {
+  if (!rows.length || (!groups.original.datasets.length && !groups.paraphrased.datasets.length)) {
     showEmpty(els.mainEmpty, "main_results.csv loaded, but no original/paraphrased numeric metric columns were found.");
+    console.warn("main_results headers:", headers);
+    console.warn("main_results rows:", rows);
     return;
   }
 
-  renderGroupedBarChart(els.mainOriginalChart, "Original", rows, labelColumn, groups.original);
-  renderGroupedBarChart(els.mainParaphrasedChart, "Paraphrased", rows, labelColumn, groups.paraphrased);
+  renderGroupedBarChart(els.mainOriginalChart, groups.original);
+  renderGroupedBarChart(els.mainParaphrasedChart, groups.paraphrased);
 }
 
 function renderHyperChart() {
