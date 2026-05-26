@@ -7,6 +7,7 @@ const files = {
 const htmlReports = [
   { title: "Anchor Quality: KGW", path: "./debug_window3_30_para_lex60_order0.html" },
   { title: "Anchor Quality: New Method", path: "./debug_window3_30_new_method_para_lex60_order0.html" },
+  { title: "Anchor Quality: Anchor Gamma 0.6", path: "./debug_window3_anchor_gamma60_para_lex60_order0.html" },
 ];
 
 const state = {
