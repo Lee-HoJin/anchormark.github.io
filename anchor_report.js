@@ -1,5 +1,10 @@
 const params = new URLSearchParams(window.location.search);
-const file = params.get("file") || "debug_window3_30_para_lex60_order0.jsonl";
+function reportFileParam(value) {
+  if (!value) return "debug_window3_30_para_lex60_order0.jsonl";
+  return value.split(/[\\/]/).pop();
+}
+
+const file = reportFileParam(params.get("file"));
 const title = params.get("title") || "Anchor Quality Report";
 
 const preferredTextFields = [

@@ -5,9 +5,9 @@ const files = {
 };
 
 const htmlReports = [
-  { title: "Anchor Quality: KGW", path: "./debug_window3_30_para_lex60_order0.html" },
+  { title: "Anchor Detection: Window 3 Gamma 0.6", path: "./anchor_detection_window3_gamma0.6.html" },
+  { title: "Anchor Quality: Anchor Gamma 0.6", path: "./debug_window3_30_para_lex60_order0.html" },
   { title: "Anchor Quality: New Method", path: "./debug_window3_30_new_method_para_lex60_order0.html" },
-  { title: "Anchor Quality: Anchor Gamma 0.6", path: "/home/hojin/watermark/experiment/dashboard/debug_window3_30_para_lex60_order0.html" },
 ];
 
 const state = {
@@ -65,7 +65,7 @@ function parseCsv(text) {
 
   row.push(cell);
   if (row.some((value) => value.trim() !== "")) rows.push(row);
-  const headers = rows.shift() ?? [];
+  const headers = (rows.shift() ?? []).map((header, index) => (index === 0 ? header.replace(/^\uFEFF/, "") : header));
   return {
     headers,
     rows: rows.map((values) =>
@@ -120,6 +120,40 @@ function chartColors(count) {
   const palette = ["#0c7a75", "#d9664f", "#d6a13d", "#6f5b89", "#3f6f9f", "#6f7d42"];
   return Array.from({ length: count }, (_, index) => palette[index % palette.length]);
 }
+
+function formatBarLabel(value) {
+  return Number.isFinite(value) ? value.toFixed(4) : "";
+}
+
+const barValueLabelPlugin = {
+  id: "barValueLabelPlugin",
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    ctx.save();
+    ctx.fillStyle = "#18201f";
+    ctx.font = "600 10px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+
+    chart.data.datasets.forEach((dataset, datasetIndex) => {
+      const meta = chart.getDatasetMeta(datasetIndex);
+      if (meta.hidden) return;
+
+      meta.data.forEach((bar, index) => {
+        const label = formatBarLabel(Number(dataset.data[index]));
+        if (!label) return;
+
+        ctx.save();
+        ctx.translate(bar.x + 2, bar.y - 8);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      });
+    });
+
+    ctx.restore();
+  },
+};
 
 function isZScore(name) {
   return /z[\s_-]*score|zscore/i.test(name);
@@ -254,6 +288,7 @@ function renderGroupedBarChart(canvas, group) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { top: 28 } },
       plugins: {
         legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } },
         tooltip: { mode: "index", intersect: false },
@@ -261,13 +296,14 @@ function renderGroupedBarChart(canvas, group) {
       scales: {
         x: { ticks: { color: "#68746f" }, grid: { display: false } },
         y: {
-        min: 0.7,
-        max: 1.0,
-        ticks: { color: "#68746f" },
-        grid: { color: "#ebe4d5" },
-      },
+          min: 0.7,
+          max: 1.04,
+          ticks: { color: "#68746f" },
+          grid: { color: "#ebe4d5" },
+        },
       },
     },
+    plugins: [barValueLabelPlugin],
   });
 }
 
