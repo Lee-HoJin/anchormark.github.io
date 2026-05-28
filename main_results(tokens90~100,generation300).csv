@@ -1,0 +1,7 @@
+﻿metrics,KGW,VLA-Mark,Anchormark (gamma=0.75),Anchormark (gamma=0.60)
+Original AUC,0.999,0.996,0.999,1.000
+Original F1,0.995,0.976,0.995,0.997
+Original Acc,0.995,0.975,0.995,0.997
+Paraphrased AUC,0.926,0.871,0.906,0.929
+Paraphrased F1,0.860,0.819,0.826,0.865
+Paraphrased Acc,0.850,0.812,0.828,0.855

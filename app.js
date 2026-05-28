@@ -1,7 +1,13 @@
 const files = {
-  detection: ["../outputs/detection/detection_results.csv"],
-  main: ["./main_results.csv", "../outputs/main_results.csv", "../outputs/detection/main_results.csv"],
-  hyper: ["./hyperparameter_analysis.csv", "../outputs/hyperparameter_analysis.csv", "../outputs/detection/hyperparameter_analysis.csv"],
+  mainFallbacks: [
+    "./main_results.csv",
+    "./main_results(tokens90~100).csv",
+    "./main_results(tokens90~100,generation300).csv",
+    "./main_results(tokens90~200).csv",
+    "./main_results(1004).csv",
+    "../outputs/main_results.csv",
+    "../outputs/detection/main_results.csv",
+  ],
 };
 
 const htmlReports = [
@@ -11,27 +17,28 @@ const htmlReports = [
 ];
 
 const state = {
-  detection: { rows: [], headers: [], filteredRows: [] },
-  main: { rows: [], headers: [] },
-  hyper: { rows: [], headers: [] },
+  main: { path: "", rows: [], headers: [], filteredRows: [] },
+  mainFiles: [],
+};
+
+const charts = {
+  mainOriginal: null,
+  mainParaphrased: null,
 };
 
 const els = {
+  mainFiles: document.querySelector("#mainFiles"),
   mainRows: document.querySelector("#mainRows"),
-  hyperRows: document.querySelector("#hyperRows"),
   reportCount: document.querySelector("#reportCount"),
   mainStatus: document.querySelector("#mainStatus"),
+  mainCsvSelect: document.querySelector("#mainCsvSelect"),
+  mainSearchInput: document.querySelector("#mainSearchInput"),
+  downloadMainCsv: document.querySelector("#downloadMainCsv"),
   mainOriginalChart: document.querySelector("#mainOriginalChart"),
   mainParaphrasedChart: document.querySelector("#mainParaphrasedChart"),
-  hyperStatus: document.querySelector("#hyperStatus"),
-  hyperChart: document.querySelector("#hyperChart"),
   mainEmpty: document.querySelector("#mainEmpty"),
-  hyperEmpty: document.querySelector("#hyperEmpty"),
-  tableHead: document.querySelector("#tableHead"),
-  tableBody: document.querySelector("#tableBody"),
-  searchInput: document.querySelector("#searchInput"),
-  resultFilter: document.querySelector("#resultFilter"),
-  downloadCsv: document.querySelector("#downloadCsv"),
+  mainTableHead: document.querySelector("#mainTableHead"),
+  mainTableBody: document.querySelector("#mainTableBody"),
   reportGrid: document.querySelector("#reportGrid"),
 };
 
@@ -86,6 +93,51 @@ async function loadFirst(paths) {
     }
   }
   throw new Error(errors.join("\n"));
+}
+
+function normalizePath(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  return path.startsWith(".") || path.startsWith("/") ? path : `./${path}`;
+}
+
+async function discoverMainCsvFiles() {
+  const found = new Set();
+
+  try {
+    const response = await fetch("./");
+    if (response.ok) {
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      [...doc.querySelectorAll("a[href]")]
+        .map((link) => decodeURIComponent(link.getAttribute("href") || ""))
+        .filter((href) => /^main_results.*\.csv$/i.test(href))
+        .forEach((href) => found.add(normalizePath(href)));
+    }
+  } catch (error) {
+    console.warn("Could not discover main_results CSV files from directory listing.", error);
+  }
+
+  files.mainFallbacks.forEach((path) => found.add(path));
+
+  const available = [];
+  for (const path of found) {
+    try {
+      const response = await fetchPath(path, { method: "HEAD" });
+      if (response.ok) available.push(path);
+    } catch (error) {
+      console.warn(`Could not check ${path}`, error);
+    }
+  }
+
+  return available.length ? available : files.mainFallbacks;
+}
+
+function fileLabel(path) {
+  return decodeURIComponent(path.split("/").pop() || path);
+}
+
+function fetchPath(path, options) {
+  return fetch(encodeURI(path), options);
 }
 
 function numericValue(value) {
@@ -264,16 +316,28 @@ function buildMainChartGroups(headers, rows) {
     };
   }
 
+  const labelColumn = pickLabelColumn(headers, rows);
+  const numericColumns = pickNumericColumns(headers, rows).filter((header) => header !== labelColumn);
+
   return {
     original: buildWideMainGroup(rows, labelColumn, numericColumns.slice(0, 3)),
     paraphrased: buildWideMainGroup(rows, labelColumn, numericColumns.slice(3, 6)),
   };
 }
 
-function renderGroupedBarChart(canvas, group) {
+function clearMainCharts() {
+  Object.keys(charts).forEach((key) => {
+    if (!charts[key]) return;
+    charts[key].destroy();
+    charts[key] = null;
+  });
+}
+
+function renderGroupedBarChart(canvas, group, chartKey) {
   if (!canvas || !group?.datasets.length) return;
+  if (charts[chartKey]) charts[chartKey].destroy();
   const colors = chartColors(group.datasets.length);
-  new Chart(canvas, {
+  charts[chartKey] = new Chart(canvas, {
     type: "bar",
     data: {
       labels: group.labels,
@@ -312,95 +376,43 @@ function renderMainChart() {
   const groups = buildMainChartGroups(headers, rows);
 
   if (!rows.length || (!groups.original.datasets.length && !groups.paraphrased.datasets.length)) {
-    showEmpty(els.mainEmpty, "main_results.csv loaded, but no original/paraphrased numeric metric columns were found.");
+    clearMainCharts();
+    showEmpty(els.mainEmpty, `${fileLabel(state.main.path || "main_results.csv")} loaded, but no original/paraphrased numeric metric columns were found.`);
     console.warn("main_results headers:", headers);
     console.warn("main_results rows:", rows);
     return;
   }
 
-  renderGroupedBarChart(els.mainOriginalChart, groups.original);
-  renderGroupedBarChart(els.mainParaphrasedChart, groups.paraphrased);
+  els.mainEmpty.hidden = true;
+  renderGroupedBarChart(els.mainOriginalChart, groups.original, "mainOriginal");
+  renderGroupedBarChart(els.mainParaphrasedChart, groups.paraphrased, "mainParaphrased");
 }
 
-function renderHyperChart() {
-  const { headers, rows } = state.hyper;
-  const labelColumn =
-    headers.find((header) => /param|alpha|beta|gamma|lambda|threshold|step|x|value/i.test(header)) ??
-    headers[0];
-  const numericColumns = pickNumericColumns(headers, rows).filter((header) => header !== labelColumn);
-  if (!rows.length || !labelColumn || numericColumns.length === 0) {
-    showEmpty(els.hyperEmpty, "hyperparameter_analysis.csv loaded, but no line-series columns were found.");
-    return;
-  }
-  const colors = chartColors(numericColumns.length);
-  new Chart(els.hyperChart, {
-    type: "line",
-    data: {
-      labels: rows.map((row, index) => row[labelColumn] || `Row ${index + 1}`),
-      datasets: numericColumns.map((column, index) => ({
-        label: column,
-        data: rows.map((row) => numericValue(row[column]) ?? null),
-        borderColor: colors[index],
-        backgroundColor: colors[index],
-        pointRadius: 3,
-        pointHoverRadius: 5,
-        tension: 0.32,
-        spanGaps: true,
-      })),
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
-      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, color: "#18201f" } } },
-      scales: {
-        x: { ticks: { color: "#68746f" }, grid: { display: false } },
-        y: { min:0.4, ticks: { color: "#68746f" }, grid: { color: "#ebe4d5" } },
-      },
-    },
-  });
-}
-
-function isDetected(row) {
-  const direct = Object.entries(row).find(([key]) => /detect|watermark|prediction|result/i.test(key));
-  const value = String(direct?.[1] ?? Object.values(row).join(" ")).toLowerCase();
-  if (/\b(not detected|false|clean|negative|no watermark|benign)\b/.test(value)) return false;
-  return /\b(detected|true|watermarked|positive|yes)\b/.test(value);
-}
-
-function formatCell(header, value, row) {
-  if (/detect|watermark|prediction|result/i.test(header)) {
-    const detected = isDetected(row);
-    return `<span class="pill ${detected ? "good" : "bad"}">${escapeHtml(value || (detected ? "Detected" : "Not detected"))}</span>`;
-  }
+function formatCell(value) {
   if (/^https?:\/\//i.test(value)) {
     return `<a href="${escapeAttribute(value)}" target="_blank" rel="noreferrer">${escapeHtml(value)}</a>`;
   }
   return escapeHtml(value);
 }
 
-function renderTable() {
-  const { headers, filteredRows } = state.detection;
-  els.tableHead.innerHTML = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
+function renderMainTable() {
+  const { headers, filteredRows } = state.main;
+  els.mainTableHead.innerHTML = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>`;
   if (filteredRows.length === 0) {
-    els.tableBody.innerHTML = `<tr><td class="empty" colspan="${headers.length || 1}">No rows match the current filters.</td></tr>`;
+    els.mainTableBody.innerHTML = `<tr><td class="empty" colspan="${headers.length || 1}">No rows match the current search.</td></tr>`;
     return;
   }
-  els.tableBody.innerHTML = filteredRows
-    .map((row) => `<tr>${headers.map((header) => `<td>${formatCell(header, row[header] ?? "", row)}</td>`).join("")}</tr>`)
+  els.mainTableBody.innerHTML = filteredRows
+    .map((row) => `<tr>${headers.map((header) => `<td>${formatCell(row[header] ?? "")}</td>`).join("")}</tr>`)
     .join("");
 }
 
-function applyFilters() {
-  const query = els.searchInput.value.trim().toLowerCase();
-  const filter = els.resultFilter.value;
-  state.detection.filteredRows = state.detection.rows.filter((row) => {
-    const detected = isDetected(row);
-    const matchesFilter = filter === "all" || (filter === "detected" && detected) || (filter === "not-detected" && !detected);
-    const matchesQuery = query === "" || Object.values(row).join(" ").toLowerCase().includes(query);
-    return matchesFilter && matchesQuery;
-  });
-  renderTable();
+function applyMainSearch() {
+  const query = els.mainSearchInput.value.trim().toLowerCase();
+  state.main.filteredRows = state.main.rows.filter((row) =>
+    query ? Object.values(row).join(" ").toLowerCase().includes(query) : true,
+  );
+  renderMainTable();
 }
 
 function renderReports() {
@@ -412,48 +424,48 @@ function renderReports() {
     .join("");
 }
 
-async function initCharts() {
+async function loadMainCsv(path) {
   try {
-    const main = await loadFirst(files.main);
-    state.main = main;
+    clearMainCharts();
+    const response = await fetchPath(path);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const main = { path, ...parseCsv(await response.text()) };
+    state.main = { ...main, filteredRows: main.rows };
     els.mainRows.textContent = main.rows.length.toLocaleString();
-    setStatus(els.mainStatus, "ready", main.path);
+    setStatus(els.mainStatus, "ready", fileLabel(path));
+    els.mainSearchInput.value = "";
     renderMainChart();
+    renderMainTable();
   } catch (error) {
     setStatus(els.mainStatus, "missing", "Missing");
-    showEmpty(els.mainEmpty, "Could not load main_results.csv. Check the path list in app.js.");
-    console.error(error);
-  }
-  try {
-    const hyper = await loadFirst(files.hyper);
-    state.hyper = hyper;
-    els.hyperRows.textContent = hyper.rows.length.toLocaleString();
-    setStatus(els.hyperStatus, "ready", hyper.path);
-    renderHyperChart();
-  } catch (error) {
-    setStatus(els.hyperStatus, "missing", "Missing");
-    showEmpty(els.hyperEmpty, "Could not load hyperparameter_analysis.csv. Check the path list in app.js.");
+    showEmpty(els.mainEmpty, `Could not load ${fileLabel(path)}.`);
+    els.mainRows.textContent = "0";
+    els.mainTableHead.innerHTML = "";
+    els.mainTableBody.innerHTML = `<tr><td class="empty">Could not load ${escapeHtml(fileLabel(path))}.</td></tr>`;
     console.error(error);
   }
 }
 
-async function initTable() {
+async function initMainResults() {
   try {
-    const detection = await loadFirst(files.detection);
-    state.detection = { ...detection, filteredRows: detection.rows };
-    renderTable();
+    state.mainFiles = await discoverMainCsvFiles();
+    els.mainFiles.textContent = state.mainFiles.length.toLocaleString();
+    els.mainCsvSelect.innerHTML = state.mainFiles
+      .map((path) => `<option value="${escapeAttribute(path)}">${escapeHtml(fileLabel(path))}</option>`)
+      .join("");
+    await loadMainCsv(state.mainFiles[0]);
   } catch (error) {
-    els.tableBody.innerHTML = `<tr><td class="empty">Could not load detection_results.csv.</td></tr>`;
+    setStatus(els.mainStatus, "missing", "Missing");
+    showEmpty(els.mainEmpty, "Could not find any main_results CSV files.");
     console.error(error);
   }
 }
 
-els.searchInput.addEventListener("input", applyFilters);
-els.resultFilter.addEventListener("change", applyFilters);
-els.downloadCsv.addEventListener("click", () => {
-  window.location.href = files.detection[0];
+els.mainCsvSelect.addEventListener("change", () => loadMainCsv(els.mainCsvSelect.value));
+els.mainSearchInput.addEventListener("input", applyMainSearch);
+els.downloadMainCsv.addEventListener("click", () => {
+  if (state.main.path) window.location.href = state.main.path;
 });
 
 renderReports();
-initCharts();
-initTable();
+initMainResults();

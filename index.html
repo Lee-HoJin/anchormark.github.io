@@ -12,12 +12,12 @@
     <header class="hero">
       <div class="heroCopy">
         <p class="eyebrow">Watermark Experiment</p>
-        <h1>Detection Results Dashboard</h1>
-        <p class="lede">Main results, hyperparameter trends, and generated qualitative reports in one GitHub Pages-friendly view.</p>
+        <h1>Main Results Dashboard</h1>
+        <p class="lede">Main result charts, CSV tables, and generated qualitative reports in one GitHub Pages-friendly view.</p>
       </div>
       <div class="heroStats" aria-label="Dataset summary">
+        <article><span>Main CSVs</span><strong id="mainFiles">0</strong></article>
         <article><span>Main Rows</span><strong id="mainRows">0</strong></article>
-        <article><span>Hyperparameter Rows</span><strong id="hyperRows">0</strong></article>
         <article><span>Reports</span><strong id="reportCount">0</strong></article>
       </div>
     </header>
@@ -29,7 +29,12 @@
             <p class="panelKicker">Grouped Bar Charts</p>
             <h2>Main Results</h2>
           </div>
-          <span id="mainStatus" class="status">Loading</span>
+          <div class="toolbar">
+            <select id="mainCsvSelect" aria-label="Select main results CSV"></select>
+            <input id="mainSearchInput" type="search" placeholder="Search rows..." />
+            <button id="downloadMainCsv" type="button">CSV</button>
+            <span id="mainStatus" class="status">Loading</span>
+          </div>
         </div>
         <div class="splitCharts">
           <div class="chartBody">
@@ -42,42 +47,10 @@
           </div>
           <p id="mainEmpty" class="empty" hidden></p>
         </div>
-      </section>
-
-      <section class="panel">
-        <div class="panelHeader">
-          <div>
-            <p class="panelKicker">Line Chart</p>
-            <h2>Hyperparameter Analysis</h2>
-          </div>
-          <span id="hyperStatus" class="status">Loading</span>
-        </div>
-        <div class="chartBody">
-          <canvas id="hyperChart" aria-label="Hyperparameter analysis line chart"></canvas>
-          <p id="hyperEmpty" class="empty" hidden></p>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panelHeader">
-          <div>
-            <p class="panelKicker">CSV Table</p>
-            <h2>Detection Results</h2>
-          </div>
-          <div class="toolbar">
-            <input id="searchInput" type="search" placeholder="Search rows..." />
-            <select id="resultFilter" aria-label="Filter detection results">
-              <option value="all">All</option>
-              <option value="detected">Detected</option>
-              <option value="not-detected">Not detected</option>
-            </select>
-            <button id="downloadCsv" type="button">CSV</button>
-          </div>
-        </div>
         <div class="tableWrap">
           <table>
-            <thead id="tableHead"></thead>
-            <tbody id="tableBody"></tbody>
+            <thead id="mainTableHead"></thead>
+            <tbody id="mainTableBody"></tbody>
           </table>
         </div>
       </section>
