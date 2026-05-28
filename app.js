@@ -9,6 +9,7 @@ const files = {
 
 const htmlReports = [
   { title: "Anchor Detection: Window 3 Gamma 0.6", path: "./anchor_detection_window3_gamma0.6.html" },
+  { title: "Anchor Quality: Rep Split", path: "./debug_rep_split_para_lex60_order0.html" },
   { title: "Anchor Quality: Anchor Gamma 0.6", path: "./debug_window3_30_para_lex60_order0.html" },
   { title: "Anchor Quality: New Method", path: "./debug_window3_30_new_method_para_lex60_order0.html" },
 ];
