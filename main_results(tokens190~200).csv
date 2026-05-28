@@ -1,0 +1,7 @@
+﻿metrics,KGW,Anchormark (k=3000),Anchormark (gamma 0.6)
+Original AUC,1.000,1.000,1.000
+Original F1,0.9985,0.9975,0.9965
+Original Acc,0.9985,0.9975,0.9965
+Paraphrased AUC,0.9578,0.9621,0.9586
+Paraphrased F1,0.8959,0.8994,0.8953
+Paraphrased Acc,0.8984,0.8994,0.8944
