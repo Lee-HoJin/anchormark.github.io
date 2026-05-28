@@ -1,12 +1,9 @@
 const files = {
   mainFallbacks: [
-    "./main_results.csv",
     "./main_results(tokens90~100).csv",
     "./main_results(tokens90~100,generation300).csv",
     "./main_results(tokens90~200).csv",
-    "./main_results(1004).csv",
-    "../outputs/main_results.csv",
-    "../outputs/detection/main_results.csv",
+    "./main_results(tokens190~200).csv",
   ],
 };
 
