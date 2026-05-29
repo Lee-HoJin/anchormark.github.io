@@ -114,6 +114,19 @@ function chartColors(count) {
   return Array.from({ length: count }, (_, index) => palette[index % palette.length]);
 }
 
+function axisBounds(values) {
+  if (!values.length) return { min: 0, max: 1 };
+
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const range = maxValue - minValue;
+  const padding = range > 0 ? range * 0.22 : Math.max(Math.abs(maxValue) * 0.04, 0.05);
+  const min = minValue >= 0 ? Math.max(0, minValue - padding) : minValue - padding;
+  const max = maxValue + padding;
+
+  return { min, max: max > min ? max : min + 1 };
+}
+
 function formatBarLabel(value) {
   return Number.isFinite(value) ? value.toFixed(4) : "";
 }
@@ -288,8 +301,8 @@ function renderGroupedBarChart(canvas, group, chartKey) {
   if (charts[chartKey]) charts[chartKey].destroy();
   const colors = chartColors(group.datasets.length);
   const values = group.datasets.flatMap((dataset) => dataset.values).filter(Number.isFinite);
-  const maxValue = Math.max(...values, 0);
-  const scoreLike = maxValue <= 1.04 && values.every((value) => value >= 0.7);
+  const barColors = chartColors(group.labels.length);
+  const yAxis = axisBounds(values);
   charts[chartKey] = new Chart(canvas, {
     type: "bar",
     data: {
@@ -297,7 +310,7 @@ function renderGroupedBarChart(canvas, group, chartKey) {
       datasets: group.datasets.map((dataset, index) => ({
         label: dataset.label,
         data: dataset.values,
-        backgroundColor: colors[index],
+        backgroundColor: group.datasets.length === 1 ? barColors : colors[index],
         borderRadius: 7,
         borderSkipped: false,
       })),
@@ -313,8 +326,8 @@ function renderGroupedBarChart(canvas, group, chartKey) {
       scales: {
         x: { ticks: { color: "#68746f" }, grid: { display: false } },
         y: {
-          min: scoreLike ? 0.7 : 0,
-          max: scoreLike ? 1.04 : Math.max(1, Math.ceil(maxValue * 1.15)),
+          min: yAxis.min,
+          max: yAxis.max,
           ticks: { color: "#68746f" },
           grid: { color: "#ebe4d5" },
         },
