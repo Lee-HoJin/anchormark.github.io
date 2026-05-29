@@ -1,10 +1,5 @@
 const files = {
-  mainFallbacks: [
-    "./main_results(tokens90~100).csv",
-    "./main_results(tokens90~100,generation300).csv",
-    "./main_results(tokens90~200).csv",
-    "./main_results(tokens190~200).csv",
-  ],
+  mainCsv: "./main_results(tokens190~200).csv",
 };
 
 const htmlReports = [
@@ -15,8 +10,7 @@ const htmlReports = [
 ];
 
 const state = {
-  main: { path: "", rows: [], headers: [], filteredRows: [] },
-  mainFiles: [],
+  main: { path: "", rows: [], headers: [], filteredRows: [], metrics: [], selectedMetric: "" },
 };
 
 const charts = {
@@ -29,7 +23,7 @@ const els = {
   mainRows: document.querySelector("#mainRows"),
   reportCount: document.querySelector("#reportCount"),
   mainStatus: document.querySelector("#mainStatus"),
-  mainCsvSelect: document.querySelector("#mainCsvSelect"),
+  mainMetricSelect: document.querySelector("#mainMetricSelect"),
   mainSearchInput: document.querySelector("#mainSearchInput"),
   downloadMainCsv: document.querySelector("#downloadMainCsv"),
   mainOriginalChart: document.querySelector("#mainOriginalChart"),
@@ -77,57 +71,6 @@ function parseCsv(text) {
       Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])),
     ),
   };
-}
-
-async function loadFirst(paths) {
-  const errors = [];
-  for (const path of paths) {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return { path, ...parseCsv(await response.text()) };
-    } catch (error) {
-      errors.push(`${path}: ${error.message}`);
-    }
-  }
-  throw new Error(errors.join("\n"));
-}
-
-function normalizePath(path) {
-  if (/^https?:\/\//i.test(path)) return path;
-  return path.startsWith(".") || path.startsWith("/") ? path : `./${path}`;
-}
-
-async function discoverMainCsvFiles() {
-  const found = new Set();
-
-  try {
-    const response = await fetch("./");
-    if (response.ok) {
-      const html = await response.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      [...doc.querySelectorAll("a[href]")]
-        .map((link) => decodeURIComponent(link.getAttribute("href") || ""))
-        .filter((href) => /^main_results.*\.csv$/i.test(href))
-        .forEach((href) => found.add(normalizePath(href)));
-    }
-  } catch (error) {
-    console.warn("Could not discover main_results CSV files from directory listing.", error);
-  }
-
-  files.mainFallbacks.forEach((path) => found.add(path));
-
-  const available = [];
-  for (const path of found) {
-    try {
-      const response = await fetchPath(path, { method: "HEAD" });
-      if (response.ok) available.push(path);
-    } catch (error) {
-      console.warn(`Could not check ${path}`, error);
-    }
-  }
-
-  return available.length ? available : files.mainFallbacks;
 }
 
 function fileLabel(path) {
@@ -210,7 +153,7 @@ function isZScore(name) {
 }
 
 function isOriginalName(name) {
-  return /(^|[_\s-])(orig|original)([_\s-]|$)/i.test(name);
+  return /(^|[_\s-])(orig|original|watermarked|wm)([_\s-]|$)/i.test(name);
 }
 
 function isParaphrasedName(name) {
@@ -233,6 +176,22 @@ function metricLabel(header) {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function stripMetricSplit(name) {
+  return String(name)
+    .replace(/^(orig|original|watermarked|wm|para|paraphrase|paraphrased|rewrite|rewritten)\s+/i, "")
+    .trim();
+}
+
+function getMainMetricNames(headers, rows) {
+  if (headers[0]?.toLowerCase() === "metrics") {
+    return [...new Set(rows.map((row) => stripMetricSplit(row.metrics)).filter(Boolean))];
+  }
+
+  return pickNumericColumns(headers, rows)
+    .map(metricLabel)
+    .filter(Boolean);
 }
 
 function buildWideMainGroup(rows, labelColumn, columns) {
@@ -263,54 +222,47 @@ function buildLongMainGroups(headers, rows) {
     .filter((metric) => !isZScore(metric))
     .slice(0, 3);
 
-  function makeGroup(prefix) {
-    const metricRows = [
-      ["AUC", rowFor(`${prefix} AUC`)],
-      ["F1", rowFor(`${prefix} F1`)],
-      ["ACC", rowFor(`${prefix} Acc`)],
-    ].filter(([, row]) => row);
-
-    return {
-      labels: metricRows.map(([metric]) => metric),
-      datasets: modelColumns.map((model) => ({
-        label: model,
-        values: metricRows.map(([, row]) => numericValue(row[model]) ?? 0),
-      })),
-    };
-  } 
-
   return {
-    original: makeGroup(originalMetrics, rows.slice(0, 3)),
-    paraphrased: makeGroup(paraphrasedMetrics, rows.slice(3, 6)),
+    original: buildWideMainGroup(rows.slice(0, 3), labelColumn, originalMetrics),
+    paraphrased: buildWideMainGroup(rows.slice(3, 6), labelColumn, paraphrasedMetrics),
   };
 }
-function buildMainChartGroups(headers, rows) {
+function findMainMetricRow(rows, split, metric) {
+  const splitPatterns = {
+    watermarked: /^(orig|original|watermarked|wm)\s+/i,
+    paraphrased: /^(para|paraphrase|paraphrased|rewrite|rewritten)\s+/i,
+  };
+  const splitPattern = splitPatterns[split];
+
+  return rows.find((row) => {
+    const name = String(row.metrics || "");
+    return splitPattern.test(name) && stripMetricSplit(name).toLowerCase() === metric.toLowerCase();
+  });
+}
+
+function buildMainChartGroups(headers, rows, metric) {
   if (headers[0]?.toLowerCase() === "metrics") {
     const modelColumns = headers.slice(1);
+    const watermarkedRow = findMainMetricRow(rows, "watermarked", metric);
+    const paraphrasedRow = findMainMetricRow(rows, "paraphrased", metric);
 
-    function rowFor(label) {
-      return rows.find((row) => String(row.metrics).toLowerCase() === label.toLowerCase());
-    }
-
-    function makeGroup(prefix) {
-      const metricRows = [
-        ["AUC", rowFor(`${prefix} AUC`)],
-        ["F1", rowFor(`${prefix} F1`)],
-        ["ACC", rowFor(`${prefix} Acc`)],
-      ].filter(([, row]) => row);
-
+    function makeGroup(label, row) {
       return {
-        labels: ["AUC", "F1", "ACC"],
-        datasets: modelColumns.map((model) => ({
-          label: model,
-          values: metricRows.map(([, row]) => numericValue(row[model]) ?? 0),
-        })),
+        labels: modelColumns,
+        datasets: row
+          ? [
+              {
+                label,
+                values: modelColumns.map((model) => numericValue(row[model]) ?? 0),
+              },
+            ]
+          : [],
       };
     }
 
     return {
-      original: makeGroup("Original"),
-      paraphrased: makeGroup("Paraphrased"),
+      original: makeGroup("Watermarked", watermarkedRow),
+      paraphrased: makeGroup("Paraphrased", paraphrasedRow),
     };
   }
 
@@ -335,6 +287,9 @@ function renderGroupedBarChart(canvas, group, chartKey) {
   if (!canvas || !group?.datasets.length) return;
   if (charts[chartKey]) charts[chartKey].destroy();
   const colors = chartColors(group.datasets.length);
+  const values = group.datasets.flatMap((dataset) => dataset.values).filter(Number.isFinite);
+  const maxValue = Math.max(...values, 0);
+  const scoreLike = maxValue <= 1.04 && values.every((value) => value >= 0.7);
   charts[chartKey] = new Chart(canvas, {
     type: "bar",
     data: {
@@ -358,8 +313,8 @@ function renderGroupedBarChart(canvas, group, chartKey) {
       scales: {
         x: { ticks: { color: "#68746f" }, grid: { display: false } },
         y: {
-          min: 0.7,
-          max: 1.04,
+          min: scoreLike ? 0.7 : 0,
+          max: scoreLike ? 1.04 : Math.max(1, Math.ceil(maxValue * 1.15)),
           ticks: { color: "#68746f" },
           grid: { color: "#ebe4d5" },
         },
@@ -371,11 +326,12 @@ function renderGroupedBarChart(canvas, group, chartKey) {
 
 function renderMainChart() {
   const { headers, rows } = state.main;
-  const groups = buildMainChartGroups(headers, rows);
+  const metric = state.main.selectedMetric || state.main.metrics[0] || "";
+  const groups = buildMainChartGroups(headers, rows, metric);
 
   if (!rows.length || (!groups.original.datasets.length && !groups.paraphrased.datasets.length)) {
     clearMainCharts();
-    showEmpty(els.mainEmpty, `${fileLabel(state.main.path || "main_results.csv")} loaded, but no original/paraphrased numeric metric columns were found.`);
+    showEmpty(els.mainEmpty, `${fileLabel(state.main.path || "main_results.csv")} loaded, but no watermarked/paraphrased values were found for ${metric || "the selected metric"}.`);
     console.warn("main_results headers:", headers);
     console.warn("main_results rows:", rows);
     return;
@@ -428,9 +384,13 @@ async function loadMainCsv(path) {
     const response = await fetchPath(path);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const main = { path, ...parseCsv(await response.text()) };
-    state.main = { ...main, filteredRows: main.rows };
+    const metrics = getMainMetricNames(main.headers, main.rows);
+    state.main = { ...main, filteredRows: main.rows, metrics, selectedMetric: metrics[0] || "" };
     els.mainRows.textContent = main.rows.length.toLocaleString();
     setStatus(els.mainStatus, "ready", fileLabel(path));
+    els.mainMetricSelect.innerHTML = metrics
+      .map((metric) => `<option value="${escapeAttribute(metric)}">${escapeHtml(metric)}</option>`)
+      .join("");
     els.mainSearchInput.value = "";
     renderMainChart();
     renderMainTable();
@@ -446,12 +406,8 @@ async function loadMainCsv(path) {
 
 async function initMainResults() {
   try {
-    state.mainFiles = await discoverMainCsvFiles();
-    els.mainFiles.textContent = state.mainFiles.length.toLocaleString();
-    els.mainCsvSelect.innerHTML = state.mainFiles
-      .map((path) => `<option value="${escapeAttribute(path)}">${escapeHtml(fileLabel(path))}</option>`)
-      .join("");
-    await loadMainCsv(state.mainFiles[0]);
+    els.mainFiles.textContent = "1";
+    await loadMainCsv(files.mainCsv);
   } catch (error) {
     setStatus(els.mainStatus, "missing", "Missing");
     showEmpty(els.mainEmpty, "Could not find any main_results CSV files.");
@@ -459,7 +415,10 @@ async function initMainResults() {
   }
 }
 
-els.mainCsvSelect.addEventListener("change", () => loadMainCsv(els.mainCsvSelect.value));
+els.mainMetricSelect.addEventListener("change", () => {
+  state.main.selectedMetric = els.mainMetricSelect.value;
+  renderMainChart();
+});
 els.mainSearchInput.addEventListener("input", applyMainSearch);
 els.downloadMainCsv.addEventListener("click", () => {
   if (state.main.path) window.location.href = state.main.path;

@@ -16,7 +16,7 @@
         <p class="lede">Main result charts, CSV tables, and generated qualitative reports in one GitHub Pages-friendly view.</p>
       </div>
       <div class="heroStats" aria-label="Dataset summary">
-        <article><span>Main CSVs</span><strong id="mainFiles">0</strong></article>
+        <article><span>Main CSV</span><strong id="mainFiles">0</strong></article>
         <article><span>Main Rows</span><strong id="mainRows">0</strong></article>
         <article><span>Reports</span><strong id="reportCount">0</strong></article>
       </div>
@@ -30,7 +30,7 @@
             <h2>Main Results</h2>
           </div>
           <div class="toolbar">
-            <select id="mainCsvSelect" aria-label="Select main results CSV"></select>
+            <select id="mainMetricSelect" aria-label="Select main results metric"></select>
             <input id="mainSearchInput" type="search" placeholder="Search rows..." />
             <button id="downloadMainCsv" type="button">CSV</button>
             <span id="mainStatus" class="status">Loading</span>
@@ -38,8 +38,8 @@
         </div>
         <div class="splitCharts">
           <div class="chartBody">
-            <h3 class="chartTitle">Original</h3>
-            <canvas id="mainOriginalChart" aria-label="Original main results bar chart"></canvas>
+            <h3 class="chartTitle">Watermarked</h3>
+            <canvas id="mainOriginalChart" aria-label="Watermarked main results bar chart"></canvas>
           </div>
           <div class="chartBody">
             <h3 class="chartTitle">Paraphrased</h3>
