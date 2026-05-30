@@ -179,6 +179,35 @@ canvas {
   height: 350px;
 }
 
+.rocGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 0 16px 18px;
+}
+
+.rocFigure {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.rocFigure figcaption {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rocFigure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .toolbar,
 .chartTools {
   display: flex;
@@ -330,7 +359,8 @@ code {
 
 @media (max-width: 980px) {
   .hero,
-  .chartGrid {
+  .chartGrid,
+  .rocGrid {
     grid-template-columns: 1fr;
   }
 }

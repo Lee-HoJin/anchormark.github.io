@@ -394,7 +394,7 @@ function renderReports() {
 async function loadMainCsv(path) {
   try {
     clearMainCharts();
-    const response = await fetchPath(path);
+    const response = await fetchPath(path, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const main = { path, ...parseCsv(await response.text()) };
     const metrics = getMainMetricNames(main.headers, main.rows);
